@@ -125,12 +125,10 @@ parseStep = (i, mixdepth, portion, counterparties, address, wait, rounding, stat
       { mixdepth, portion, counterparties, address, wait, rounding, completed: false }
   else
     text = "#{i}: Send "
-    if portion == 0
-      text += "all of "
-    else if portion < 1
-      text += "#{Math.round(portion * 100.0)}% of "
-    else
+    if portion >= 1
       text += "#{portion} satoshis from "
+    else if portion != 0
+      text += "#{Math.round(portion * 100.0)}% of "
     text += "mixdepth #{mixdepth} to "
     switch address
       when 'INTERNAL' then text += "mixdepth #{mixdepth + 1}"
@@ -167,6 +165,7 @@ parse = (input, output, json) ->
     step: (results, parser) ->
 #      console.log "step: results.data=", results.data
 #      console.log "step: results.errors=", results.errors
+      return if not results.data[0]?
       [ mixdepth, portion, counterparties, address, wait, rounding, state ] = results.data
       step = parseStep i, mixdepth, portion, counterparties, address, wait, rounding, state, json
       if json
