@@ -89,6 +89,12 @@ args = yargs
         alias: 'i'
         describe: 'The input file. (default: stdin)'
       }
+      .option 'amtmixdepths', {
+        type: 'number'
+        default: 5
+        alias: 'A'
+        describe: 'Number of mixdepths ever used in the wallet.'
+      }
   .help()
   .version()
   .option 'output', {
@@ -114,6 +120,9 @@ args = yargs
         throw new Error "The wait time cannot be negative."
       if argv.rounding < 0 or argv.rounding > 16 or Math.floor(argv.rounding) != argv.rounding
         throw new Error "The rounding must be an integer between 0 and 16 (inclusive)."
+    if argv._[0] is 'explain'
+      if argv.amtmixdepths < 5 or Math.floor(argv.amtmixdepths) != argv.amtmixdepths
+        throw new Error "The number of mixdepths must be an integer greater than 5 (the default)."
     return true
   .argv
 
@@ -133,7 +142,7 @@ explainStep = (i, mixdepth, portion, counterparties, address, wait, rounding, st
       text += "#{Math.round(portion * 100.0)}% of "
     text += "mixdepth #{mixdepth} to "
     switch address
-      when 'INTERNAL' then text += "mixdepth #{mixdepth + 1}"
+      when 'INTERNAL' then text += "mixdepth #{(mixdepth + 1) % args.amtmixdepths}"
       when 'addrask' then text += "a user-supplied address"
       else text += "'#{address}'"
     text += " using #{counterparties} counterparties"
@@ -198,7 +207,7 @@ explain = (input, output, json) ->
 #console.log JSON.stringify(args)
 
 if args.input?
-  input = fs.createReadStream args.input
+  input = fs.createReadStream(args.input)
   input.on 'error', (error) ->
     console.error error
     process.exit()
@@ -206,7 +215,7 @@ else
   input = process.stdin
 
 if args.output?
-  output = fs.createWriteStream args.output
+  output = fs.createWriteStream(args.output)
   output.on 'error', (error) ->
     console.error error
     process.exit
