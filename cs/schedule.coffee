@@ -1,17 +1,17 @@
-# Creates and parses joinmarket schedule files
+# Creates and explains joinmarket schedule files
 #
 # Syntax:
 #
 #    schedule create [--input <file>] [--output <file>]
 #    schedule step [--mixdepth <M>] [--portion <0-1>] [--counterparties <N>] [--address <address>] [--wait <time>]
 #                  [--rounding <0-16>] [--json] [--output <file>]
-#    schedule parse [--json] [--input <file>] [--output <file>]
+#    schedule explain [--json] [--input <file>] [--output <file>]
 #
 # Commands:
 #
-#    create - Creates a schedule based on json input
-#    step -   Creates a step based on options
-#    parse -  Parses the schedule
+#    create -   Creates a schedule based on json input
+#    step -     Creates a step
+#    explain -  Explains the schedule
 #
 # See https://github.com/JoinMarket-Org/joinmarket-clientserver/blob/master/docs/tumblerguide.md#schedules-transaction-lists
 # for a more complete explanation of the schedule items.
@@ -19,6 +19,8 @@
 csv = require 'papaparse'
 fs = require 'fs'
 yargs = require 'yargs'
+
+BLOCK_TIME = 10   # Average block time, used to compute how long the tumble will take
 
 # Configure the command line processing
 args = yargs
@@ -74,7 +76,7 @@ args = yargs
         alias: 'j'
         describe: 'The output is in JSON form.'
       }
-  .command 'parse', "Parses the steps listed in a schedule.", (yargs) ->
+  .command 'explain', "Explains the steps in a schedule.", (yargs) ->
     yargs
       .option 'json', {
         type: 'boolean'
@@ -99,7 +101,7 @@ args = yargs
       throw new Error "Missing command."
     if argv._.length > 1
       throw new Error "Unexpected '#{argv._[0]}'."
-    if argv._[0] != 'create' and argv._[0] != 'step' and argv._[0] != 'parse'
+    if argv._[0] != 'create' and argv._[0] != 'step' and argv._[0] != 'explain'
       throw new Error "'#{argv._[0]}' is an invalid command."
     if argv._[0] is 'step'
       if argv.mixdepth < 0
@@ -115,7 +117,7 @@ args = yargs
     return true
   .argv
 
-parseStep = (i, mixdepth, portion, counterparties, address, wait, rounding, state, json) ->
+explainStep = (i, mixdepth, portion, counterparties, address, wait, rounding, state, json) ->
   if json
     if typeof(state) is "number" and state is 1
       { mixdepth, portion, counterparties, address, wait, rounding, completed: true }
@@ -156,10 +158,10 @@ step = (mixdepth, portion, counterparties, address, wait, rounding, output, json
 
   return
 
-parse = (input, output, json) ->
+explain = (input, output, json) ->
   i = 1
-  finalWaitTime = 0
-  expectedTime = 0
+  finalWaitTime = 0   # Wait time for the final step (tracked so that it can be ignored)
+  expectedTime = 0    # Expected total time for the tumble
   jsonResult = []
   csv.parse input, {
     step: (results, parser) ->
@@ -167,12 +169,12 @@ parse = (input, output, json) ->
 #      console.log "step: results.errors=", results.errors
       return if not results.data[0]?
       [ mixdepth, portion, counterparties, address, wait, rounding, state ] = results.data
-      step = parseStep i, mixdepth, portion, counterparties, address, wait, rounding, state, json
+      step = explainStep(i, mixdepth, portion, counterparties, address, wait, rounding, state, json)
       if json
         jsonResult.push step
       else
         output.write step
-        expectedTime += 10 + wait
+        expectedTime += BLOCK_TIME + wait
         finalWaitTime = wait
         i += 1
       return
@@ -214,4 +216,4 @@ else
 switch args._[0]
   when 'create' then create input, output
   when 'step'   then step args.mixdepth, args.portion, args.counterparties, args.address, args.wait, args.rounding, output, args.json
-  when 'parse'  then parse input, output, args.json
+  when 'explain'  then explain input, output, args.json
